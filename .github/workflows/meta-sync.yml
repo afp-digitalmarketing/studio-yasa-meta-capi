@@ -12,11 +12,4 @@ jobs:
         with:
           python-version: '3.10'
       - run: pip install requests python-dotenv
-      - run: python3 scripts/meta_github_sync.py
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_OWNER: YOUR_GITHUB_USERNAME
-          GITHUB_REPO: studio-yasa-meta-capi
-          CSV_FILE: whatsapp_orders_current_week.csv
-          META_PIXEL_ID: 413265851175780
-          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+      - run: python3 scripts/meta_github_sync.py --github-token "${{ secrets.GITHUB_TOKEN }}" --github-owner "afp-digitalmarketing" --github-repo "studio-yasa-meta-capi" --csv-file "yasa_capi_phone_upload.csv" --meta-pixel-id "413265851175780" --meta-token "${{ secrets.META_ACCESS_TOKEN }}"
