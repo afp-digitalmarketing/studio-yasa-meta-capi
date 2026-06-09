@@ -1,0 +1,22 @@
+name: Meta CAPI Weekly Sync
+on:
+  schedule:
+    - cron: '0 10 * * 0'
+  workflow_dispatch:
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: pip install requests python-dotenv
+      - run: python3 scripts/meta_github_sync.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_OWNER: YOUR_GITHUB_USERNAME
+          GITHUB_REPO: studio-yasa-meta-capi
+          CSV_FILE: whatsapp_orders_current_week.csv
+          META_PIXEL_ID: 413265851175780
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
