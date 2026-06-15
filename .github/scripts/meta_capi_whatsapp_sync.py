@@ -204,7 +204,8 @@ def to_capi_event(o: dict) -> dict:
         "event_name": "Purchase",
         "event_time": o["event_time"],
         "event_id": o["event_id"],
-        "action_source": "business_messaging",     # WhatsApp-driven; not website -> no dedup clash
+        "action_source": "business_messaging",
+        "messaging_channel": "whatsapp",
         "user_data": ud,
         "custom_data": {"currency": CURRENCY, "value": round(o["value"], 2)},
     }
