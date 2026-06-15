@@ -55,7 +55,9 @@ jobs:
         env:
           META_PIXEL_ID: ${{ secrets.META_PIXEL_ID }}
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
-          SALES_FILE: "Penjualan-Online_2026_YASA.xlsx"
+          # Data source (pick one): a published Google Sheet CSV URL (recommended), else a local CSV file.
+          SHEET_CSV_URL: ${{ secrets.SHEET_CSV_URL }}
+          CSV_FILE: "yasa_orders.csv"
           DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
           MAX_AGE_DAYS: ${{ github.event.inputs.max_age_days || '7' }}
           META_TEST_EVENT_CODE: ${{ github.event.inputs.test_event_code || '' }}
