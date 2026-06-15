@@ -1,32 +1,75 @@
-name: Meta CAPI Weekly Sync
+name: Meta CAPI - WhatsApp/Offline Sync
+
+# Runs daily so WhatsApp/offline orders reach Meta inside the 7-day attribution window.
+# (The old weekly cadence let many WA orders fall outside the window before they were sent.)
+
 on:
   schedule:
-    - cron: '0 10 * * 0'
+    - cron: "0 10 * * *"        # 10:00 UTC daily = 17:00 Asia/Jakarta
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "1 = print only, no send (verify data first)"
+        type: choice
+        options: ["0", "1"]
+        default: "0"
+      max_age_days:
+        description: "Only send orders newer than N days (7 = normal, 62 = one-time backfill)"
+        type: string
+        default: "7"
+      test_event_code:
+        description: "Events Manager Test Event code (leave empty for live)"
+        type: string
+        default: ""
+
+permissions:
+  contents: write              # needed to commit sent_events.json back
+
+concurrency:
+  group: meta-capi-sync        # never let two runs overlap and double-send
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - uses: actions/setup-python@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-      
+          python-version: "3.11"
+
       - name: Install dependencies
-        run: pip install requests
-      
-      - name: Run sync
+        run: pip install requests pandas openpyxl
+
+      # --- Optional: keep your existing website/pixel sync here if you still want it ---
+      # - name: Run existing sync
+      #   env:
+      #     META_PIXEL_ID: ${{ secrets.META_PIXEL_ID }}
+      #     META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+      #   run: python .github/scripts/meta_github_sync.py
+
+      - name: Sync WhatsApp/offline orders to Meta
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_OWNER: afp-digitalmarketing
-          GITHUB_REPO: studio-yasa-meta-capi
-          CSV_FILE: yasa_capi_phone_upload.csv
-          META_PIXEL_ID: 413265851175780
+          META_PIXEL_ID: ${{ secrets.META_PIXEL_ID }}
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
-        run: python3 .github/scripts/meta_github_sync.py
-      
-      - name: Show logs
-        if: always()
-        run: cat sync.log 2>/dev/null || echo "No logs found"
+          SALES_FILE: "Penjualan-Online_2026_YASA.xlsx"
+          DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
+          MAX_AGE_DAYS: ${{ github.event.inputs.max_age_days || '7' }}
+          META_TEST_EVENT_CODE: ${{ github.event.inputs.test_event_code || '' }}
+        run: python .github/scripts/meta_capi_whatsapp_sync.py
+
+      - name: Commit dedup ledger
+        if: ${{ github.event.inputs.dry_run != '1' && github.event.inputs.test_event_code == '' }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [[ -n "$(git status --porcelain sent_events.json)" ]]; then
+            git add sent_events.json
+            git commit -m "chore: update CAPI sent-events ledger [skip ci]"
+            git push
+          else
+            echo "No new events logged; nothing to commit."
+          fi
