@@ -206,6 +206,7 @@ def to_capi_event(o: dict) -> dict:
         "event_id": o["event_id"],
         "action_source": "business_messaging",
         "messaging_channel": "whatsapp",
+        "page_id": "101237352397198",
         "user_data": ud,
         "custom_data": {"currency": CURRENCY, "value": round(o["value"], 2)},
     }
