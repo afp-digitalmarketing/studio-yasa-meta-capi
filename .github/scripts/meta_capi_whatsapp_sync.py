@@ -39,6 +39,7 @@ import sys
 import json
 import time
 import hashlib
+import re
 import datetime as dt
 from io import StringIO
 from pathlib import Path
@@ -78,19 +79,40 @@ def sha256(v: str) -> str:
     return hashlib.sha256(str(v).strip().lower().encode("utf-8")).hexdigest()
 
 
+def to_num(v):
+    """Parse Total even when formatted like '749,000.00' or 'Rp 749.000'."""
+    if pd.isna(v):
+        return float("nan")
+    s = str(v).strip()
+    # US-style here (comma=thousands, dot=decimal), per the sheet. Keep digits/dot/minus.
+    s = re.sub(r"[^0-9.\-]", "", s)
+    if s in ("", "-", "."):
+        return float("nan")
+    try:
+        return float(s)
+    except ValueError:
+        return float("nan")
+
+
 def norm_phone_id(raw) -> str:
-    """Indonesian phone -> E.164 digits, no '+'. Excel/CSV often drops the leading 0."""
+    """Indonesian phone -> E.164 digits, no '+'. Excel/CSV often drops the leading 0,
+    or stores the number as a float (8.2e10 / '...188.0'). Normalize all of it."""
     if pd.isna(raw):
         return ""
-    digits = "".join(ch for ch in str(raw) if ch.isdigit())
+    if isinstance(raw, float):                 # avoid 8.2389936188e10 / trailing .0
+        raw = "{:.0f}".format(raw)
+    s = str(raw).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    digits = "".join(ch for ch in s if ch.isdigit())
     if not digits:
         return ""
     if digits.startswith("0"):
-        digits = "62" + digits[1:]
+        digits = "62" + digits[1:]             # 0823... -> 62823...
     elif digits.startswith("62"):
-        pass
+        pass                                   # already E.164
     elif digits.startswith("8"):
-        digits = "62" + digits
+        digits = "62" + digits                 # admin forgot the 0: 823... -> 62823...
     return digits
 
 
@@ -115,12 +137,12 @@ def read_source() -> pd.DataFrame:
     if url:
         print(f"Reading orders from SHEET_CSV_URL ...")
         text = requests.get(url, timeout=60).text
-        return pd.read_csv(StringIO(text))
+        return pd.read_csv(StringIO(text), dtype=str)      # dtype=str => phones stay intact
     path = os.environ.get("CSV_FILE", "yasa_orders.csv")
     if not os.path.exists(path):
         sys.exit(f"ERROR: no SHEET_CSV_URL and CSV_FILE '{path}' not found. Files: {os.listdir('.')}")
     print(f"Reading orders from {path} ...")
-    return pd.read_csv(path)
+    return pd.read_csv(path, dtype=str)
 
 
 def load_wa_orders() -> list[dict]:
@@ -136,7 +158,7 @@ def load_wa_orders() -> list[dict]:
     for _, r in df.iterrows():
         if pd.isna(r.get(c["name"])):              # skip recap/subtotal rows
             continue
-        total = pd.to_numeric(r.get(c["total"]), errors="coerce")
+        total = to_num(r.get(c["total"]))
         if pd.isna(total) or total <= 0 or total > 5_000_000:
             continue
         bucket = classify(r.get(c["chan"]) if c["chan"] else None)
