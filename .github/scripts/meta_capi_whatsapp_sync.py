@@ -175,7 +175,7 @@ def load_wa_orders() -> list[dict]:
             city = "".join(ch for ch in str(r.get(c["city"])).lower() if ch.isalnum())
 
         try:
-            d = pd.to_datetime(r.get(c["date"])).date() if c["date"] else dt.date.today()
+            d = pd.to_datetime(r.get(c["date"]), dayfirst=True).date() if c["date"] else dt.date.today()
             tstr = str(r.get(c["time"])) if c["time"] else ""
             tt = pd.to_datetime(tstr).time() if tstr and tstr != "nan" else dt.time(12, 0)
             ev_time = int(dt.datetime.combine(d, tt).timestamp())
